@@ -17,15 +17,12 @@ import os, time
 
 load_dotenv()
 
-def main():
+def ProcessDate(date):
 
     driver = webdriver.Chrome()
 
     # Initial loading, including log in and navigating to attendance wizard
-    InitialLoad(driver)
-    
-    # wait for user to select date
-    input('Select the date to process...')
+    _initial_load(driver)
 
     # get to the correct context...
     frame = driver.find_element(By.ID, 'main-workspace')
@@ -34,20 +31,28 @@ def main():
     driver.switch_to.frame(workspaceframe)
     edit_button = driver.find_element(By.CSS_SELECTOR, "input#mode[value='edit']")
     edit_button.click()
+
+    # set the date
+    _set_date(driver, date)
     
     # set the filter for absent unverified
-    SetFilter(driver)
+    _set_filter(driver)
 
-    input("Please select a student...")
+    # get the first student in the list; return false if none are found
+    next = _select_first_student_in_list(driver)
 
-    ProcessCurrentRow(driver)
+    while next:
+        _process_current_row(driver)
+        _refresh_search(driver)
+        next = _select_first_student_in_list(driver)
 
-    input('Press any key to continue...')
+    driver.close()
 
-def InitialLoad(driver):
+def _initial_load(driver):
     # log in and navigate to attendance entry wizard
     print('Infinite Campus login...')
     driver.maximize_window()
+    driver.minimize_window()
     driver.get(os.getenv('INFINITECAMPUSLOGINURL'))
 
     usernameinput = driver.find_element(By.ID, 'username')
@@ -75,7 +80,13 @@ def InitialLoad(driver):
     button = driver.find_element(By.CLASS_NAME, 'button--primary')
     button.click()
 
-def SetFilter(driver):
+def _set_date(driver, date):
+    date_element = driver.find_element(By.ID, 'currentDateField')
+    date_element.click()
+    date_element.send_keys(Keys.CONTROL, 'a')
+    date_element.send_keys(date)
+
+def _set_filter(driver):
     status_element = driver.find_element(By.ID, 'status')
     status = Select(status_element)
     status.select_by_visible_text('Absent')
@@ -84,7 +95,26 @@ def SetFilter(driver):
     excuse.select_by_visible_text('Unknown')
     driver.execute_script("searchStudents();")
 
-def ProcessCurrentRow(driver):
+def _refresh_search(driver):
+    driver.execute_script("searchStudents();")
+
+def _select_first_student_in_list(driver):
+    listframe = driver.find_element(By.ID, 'searchResultsFrame')
+    driver.switch_to.frame(listframe)
+    try:
+        # attempt to select first student; if it fails, then we must be done
+        firstStudent = driver.find_element(By.XPATH, '/html/body/table/tbody/tr[1]/td/a')
+        if firstStudent.text.strip() != "":
+            firstStudent.click()
+            next = True
+        else:
+            next = False
+    except:
+        next = False
+    _switch_to_workspace_frame(driver)
+    return next
+
+def _process_current_row(driver):
     editframe = driver.find_element(By.ID, 'editModeFrame')
     driver.switch_to.frame(editframe)
 
@@ -100,21 +130,21 @@ def ProcessCurrentRow(driver):
                 
                 # Check if Code is blank and Excuse is "Absent"
                 if code_column.text.strip() == "" and status_column.text.strip().lower() == "absent":
-                    auoption = row.find_element(By.XPATH, './/td[2]/select/option[3]')
+                    auoption = row.find_element(By.XPATH, ".//td[2]/select/option[contains(text(), 'AU: Absent - Unexcused/Unverified')]")
                     auoption.click()
 
         except Exception as e:
             continue
     
     # Save the new values
+    driver.execute_script("parent.saveThisAttendance();")
     
     # return to workspace frame
+    _switch_to_workspace_frame(driver)
+
+def _switch_to_workspace_frame(driver):
     driver.switch_to.default_content()
     frame = driver.find_element(By.ID, 'main-workspace')
     driver.switch_to.frame(frame)
     workspaceframe = driver.find_element(By.ID, 'frameWorkspace')
     driver.switch_to.frame(workspaceframe)
-    
-
-if __name__ == "__main__":
-    main()
