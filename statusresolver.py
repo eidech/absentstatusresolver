@@ -52,7 +52,7 @@ def _initial_load(driver):
     # log in and navigate to attendance entry wizard
     print('Infinite Campus login...')
     driver.maximize_window()
-    driver.minimize_window()
+    #driver.minimize_window()
     driver.get(os.getenv('INFINITECAMPUSLOGINURL'))
 
     usernameinput = driver.find_element(By.ID, 'username')
