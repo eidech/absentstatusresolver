@@ -25,6 +25,7 @@ def ProcessDate(date):
     _initial_load(driver)
 
     # get to the correct context...
+    time.sleep(5)
     frame = driver.find_element(By.ID, 'main-workspace')
     driver.switch_to.frame(frame)
     workspaceframe = driver.find_element(By.ID, 'frameWorkspace')
